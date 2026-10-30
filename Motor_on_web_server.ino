@@ -3,7 +3,7 @@
 #include <Adafruit_MotorShield.h>
 
 // Replace with your network credentials
-const char* ssid = "Olin_Robotics";
+const char* ssid = "OLIN_ROBOTICS";
 const char* password = "R0B0TS-RULE";
 
 // creates state variable
