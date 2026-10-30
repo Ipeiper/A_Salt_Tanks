@@ -3,8 +3,8 @@
 #include <Adafruit_MotorShield.h>
 
 // Replace with your network credentials
-const char* ssid = "OLIN_ROBOTICS";
-const char* password = "R0B0TS-RULE";
+const char* ssid = "A_SALT_TANK_1";
+const char* password = "123456789";
 
 // creates state variable
 String outputMotor1State = "off";
@@ -87,14 +87,9 @@ void setup() {
   //set Motor speed
   Motor1->setSpeed(150);
 
-  // Connect to Wi-Fi network
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
+  //Creates wifi
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(ssid, password);
   Serial.println("");
   Serial.println("WiFi connected.");
   Serial.println("IP address: ");
