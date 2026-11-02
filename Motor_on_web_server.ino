@@ -19,6 +19,15 @@ AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 
+//Notes for HTML
+//make sure the buttons are named button1, button2, etc. this is because of the initbutton function refrencing that as an element
+// feel free to change just make sure to update here so the code doesnt break.
+//originally is sent just either 0 or 1, now going to be sent first num is id, second is state. this caps the max number of ids to 9, but I think that will be fine for our purposes
+//will also only have power go up to 99% so that we can just use 2 digits and make the code easier
+//so like "150" for motor 1 50%
+//if we need to send all the motor statuses at once we can just introduce a for loop that goes through each set of 3 characters in onmessage
+//state should now be an integer with value between 0 and 99, representing 0.00 and 0.99 repectively, rather than a string like it used to be
+
 // index_html stores the html data for the website
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
@@ -121,21 +130,22 @@ const char index_html[] PROGMEM = R"rawliteral(
     setTimeout(initWebSocket, 2000);
   }
   function onMessage(event) {
-    var state;
-    if (event.data == "1"){
-      state = "ON";
-    }
-    else{
-      state = "OFF";
-    }
-    document.getElementById('state').innerHTML = state;
+    int[] states = new int[9];//creates a 9 element array containing the values of each state
+    var id = Number(events.data.slice(0,1)[0]);
+    var value = Number(events.data.slice(1,3));//should get the first index and second index
+    state[id] = value;
+
+    document.getElementById('state'+id).innerHTML = state[id];
   }
   function onLoad(event) {
     initWebSocket();
-    initButton();
+    initButton(1);
+    initButton(2);
+    initButton(3);
+    initButton(4);
   }
-  function initButton() {
-    document.getElementById('button').addEventListener('click', toggle(num)); // need to change num so that this part actually works
+  function initButton(num) {
+    document.getElementById('button'+num).addEventListener('click', toggle(num)); // need to change num so that this part actually works
   }
   function toggle(num){
     websocket.send('toggle'+num);
@@ -151,6 +161,27 @@ void notifyClients() {
   ws.textAll(String(Motor1State)+" : "+Motor2State)+" : "+Motor3State)+" : "+Motor4State)+);
 }
 
+//handles the messages from the web socket
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+  AwsFrameInfo *info = (AwsFrameInfo*)arg;
+  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+    data[len] = 0;
+    char *str = (char *)data;
+    int num;
+    //this part makes sure the message is one of the toggles
+  if (sscanf(str, "toggle%d", &num) == 1)
+  {
+
+    changeMotor():
+    notifyClients();
+  }
+    if (strcmp((char*)data, "toggle") == 0) {
+      ledState = !ledState;
+      
+    }
+  }
+}
+
 // Create the Motor shield object with the default I2C address
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 // Or, create it with a different I2C address (say for stacking)
@@ -159,20 +190,14 @@ Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 // Select which 'port' M1, M2, M3 or M4. In this case, M1
 Adafruit_DCMotor *Motor1 = AFMS.getMotor(1);
 
+//creates 9 length arry to hold the motor state values
+int MotorState[] = {0,0,0,0,0,0,0,0,0};
 
-// Function to handle turning motor on
-void handleMotor1On() {
-  outputMotor1State = "on";
-  Motor1->run(FORWARD);
-  handleRoot();
+//this changes the motors state depending on the id of the motor and its value
+void changeMotor(id,value){
+
 }
 
-// Function to handle turning Motor off
-void handleMotor1Off() {
-  outputMotor1State = "off";
-  Motor1->run(RELEASE);
-  handleRoot();
-}
 
 
 // Function to handle the root URL and show the current states
@@ -185,8 +210,8 @@ void handleRoot() {
   html += "<body><h1>ESP32 Web Server</h1>";
 
   // Display GPIO 26 controls
-  html += "<p> Motor 1 - State " + outputMotor1State + "</p>";
-  if (outputMotor1State == "off") {
+  html += "<p> Motor 1 - State " + Motor1State + "</p>";
+  if (Motor1State == "off") {
     html += "<p><a href=\"/1/on\"><button class=\"button\">ON</button></a></p>";
   } else {
     html += "<p><a href=\"/1/off\"><button class=\"button button2\">OFF</button></a></p>";
