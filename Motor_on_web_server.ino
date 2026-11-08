@@ -16,6 +16,33 @@ int Motor4State = 0;//Disperser
 // the motors themselves
 Adafruit_DCMotor *Motors[5];
 
+// individual key state 
+bool keyW = false; 
+bool keyA = false; 
+bool keyS = false; 
+bool keyD = false; 
+
+// adjusting motor speed separately (maybe slider?)
+int motorPower = 50; 
+
+bool MotorRunning[5] = {false}
+
+// updates specified motor to a speed. positive is forward negative is backward
+void setMotor(int id, int speed) {
+  speed = constrain(speed, -255, 255)
+
+  Motors[id] -> setSpeed(abs(speed))
+
+  if (speed > 0) {
+    Motors[id] -> run(FORWARD);
+  } else if (speed < 0) {
+    Motors[id] -> run(BACKWARD);
+  } else {
+    Motors[id] -> run(RELEASE)
+  }
+}
+
+
 //Creates an asyncronious web server, allowing multiple paralell connections
 AsyncWebServer server(80); // hosts webpage at esp32 ip address
 AsyncWebSocket ws("/ws");
@@ -215,7 +242,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
     char message[16];
 
-    if (len >- sizeof(message)) return; 
+    if (len >= sizeof(message)) return; 
 
     memcpy(message, data, len);
     
@@ -226,32 +253,52 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
 
     // check index 2 to get 0 or 1, telling us whether keyup or keydown
     int pressed = atoi(message + 2);
-    
-    if (pressed == 0) {
-      Motors[1] -> run(RELEASE)
-      Motors[2] -> run(RELEASE)
-      return; 
-    }
 
     // wasd controls 
     switch (key) {
-      case 'W':
-        moveForward(); 
-        break; 
-      
-      case 'S': 
-        moveBackward(); 
-        break; 
-
-      case 'A':
-        turnLeft(); 
-        break; 
-        
-      case 'D': 
-        turnRight(); 
-        break; 
-
+      case 'W': keyW = pressed; break; 
+      case 'A': keyA = pressed; break; 
+      case 'S': keyS = pressed; break; 
+      case 'D': keyD = pressed; break; 
     }
+
+    if (keyW) {
+      resetMotorSpeed();
+      moveForward();
+    } else if (keyS) {
+      resetMotorSpeed(); 
+      moveBackward(); 
+    } else if (keyA) {
+      resetMotorSpeed(); 
+      turnLeft(); 
+    } else if (keyD) {
+      resetMotorSpeed(); 
+      turnRight(); 
+    } else if (keyW && keyA) {
+      resetMotorSpeed(); 
+      changeMotor(1, motorPower/2)
+      moveForward(); 
+
+    } else if (keyW && keyD) {
+      resetMotorSpeed(); 
+      changeMotor(2, motorPower/2)
+      moveForward(); 
+
+    } else if (keyS && keyA) {
+      resetMotorSpeed(); 
+      changeMotor(1, motorPower/2);
+      moveBackward(); 
+
+    } else if (keyS && keyD) {
+      resetMotorSpeed(); 
+      changeMotor(2, motorPower/2); 
+      moveBackward(): 
+    }
+    else {
+      Motors[1] -> run(RELEASE)
+      Motors[2] -> run(RELEASE)
+    }
+  }
 }
 
 // Create the Motor shield object with the default I2C address
@@ -261,23 +308,6 @@ Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 
 // Select which 'port' M1, M2, M3 or M4. In this case, M1
 Adafruit_DCMotor *Motor1 = AFMS.getMotor(1);
-
-// adjusting motor speed separately (maybe slider?)
-int MotorState = 50; 
-
-bool MotorRunning[5] = {false}
-
-//this changes the motors state depending on the id of the motor and its value
-void changeMotor(id,value){
-
-  // invalid cases 
-  if (id < 1 || id > 4) return; 
-  
-  // converts the 0 to 99 power percentage to 0 to 255 for motors
-  int speed = map(value, 0, 99, 0, 255)
-  Motors[id] -> setSpeed(value)
-}
-
 
 // Function to handle the root URL and show the current states
 void handleRoot() {
@@ -331,7 +361,7 @@ void setup() {
     while (1);
   }
   //set Motor speed
-  Motor1->setSpeed(150);
+  changeMotor(1, 58)
 
   //Creates wifi
   WiFi.mode(WIFI_AP);
