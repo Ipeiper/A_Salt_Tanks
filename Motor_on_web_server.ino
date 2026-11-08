@@ -1,6 +1,7 @@
 #include <WiFi.h> // esp32 wi-fi access point 
 #include <Adafruit_MotorShield.h> // motorshield 
 #include <AsyncTCP.h> // asynchronous TCP connection
+#include <Wire.h> // I2C communication
 #include <ESPAsyncWebServer.h> // webpage host and Websocket
 
 // Replace with your network credentials
@@ -16,30 +17,66 @@ int Motor4State = 0;//Disperser
 // the motors themselves
 Adafruit_DCMotor *Motors[5];
 
-// individual key state 
+// individual key state, need to be global so we don't have to check 
+// for the states of the keys being pressed in loop, only when webpage
+// sends message that the state has changed (pressed or released) 
 bool keyW = false; 
 bool keyA = false; 
 bool keyS = false; 
 bool keyD = false; 
 
-// adjusting motor speed separately (maybe slider?)
+// adjusting motor speed separately using numerical input from website
 int motorPower = 50; 
 
-bool MotorRunning[5] = {false}
+bool MotorRunning[5] = {false};
 
 // updates specified motor to a speed. positive is forward negative is backward
 void setMotor(int id, int speed) {
-  speed = constrain(speed, -255, 255)
+  speed = constrain(speed, -255, 255);
 
-  Motors[id] -> setSpeed(abs(speed))
+  Motors[id] -> setSpeed(abs(speed));
 
   if (speed > 0) {
     Motors[id] -> run(FORWARD);
   } else if (speed < 0) {
     Motors[id] -> run(BACKWARD);
   } else {
-    Motors[id] -> run(RELEASE)
+    Motors[id] -> run(RELEASE);
   }
+}
+
+void updateDriveMotors() {
+  int speed = map(motorPower, 0, 100, 0, 255);
+
+  int leftSpeed = 0; 
+  int rightSpeed = 0;
+
+  if (keyW) {
+    leftSpeed += speed; 
+    rightSpeed += speed; 
+  }
+
+  if (keyS) {
+    leftSpeed -= speed;
+    rightSpeed -= speed; 
+  }
+
+  if (keyA) {
+    leftSpeed -= speed; 
+    rightSpeed += speed; 
+  }
+
+  if (keyD) {
+    leftSpeed += speed; 
+    rightSpeed -= speed; 
+  }
+
+  leftSpeed = constrain(leftSpeed, -255, 255);
+  rightSpeed = constrain(rightSpeed, -255, 255);
+
+  setMotor(1, leftSpeed);
+  setMotor(2, rightSpeed);
+
 }
 
 
@@ -135,9 +172,11 @@ const char index_html[] PROGMEM = R"rawliteral(
   </div>
   <div class="content">
     <div class="card">
-      <h2>Output - GPIO 2</h2>
-      <p class="state">state: <span id="state">%STATE%</span></p>
-      <p><button id="button" class="button">Toggle</button></p>
+      <h2>Motor Power</h2>
+      <input type = "number" id = "motorPower" min = "0" max = "100" value = "50"> 
+      <button onclick ="setMotorSpeed()">Apply Speed </button>
+
+      <p id = "speedStatus"> Current power: 50% </p>
     </div>
   </div>
 <script>
@@ -159,12 +198,12 @@ const char index_html[] PROGMEM = R"rawliteral(
     setTimeout(initWebSocket, 2000);
   }
   function onMessage(event) {
-    int[] states = new int[9];//creates a 9 element array containing the values of each state
+    let states = [0,0,0,0,0,0,0,0,0]; //creates a 9 element array containing the values of each state
     var id = Number(event.data.slice(0,1)[0]);
     var value = Number(event.data.slice(1,3));//should get the first index and second index
-    state[id] = value;
+    states[id] = value;
 
-    document.getElementById('state'+id).innerHTML = state[id];
+    document.getElementById('states'+id).innerHTML = state[id];
   }
   function onLoad(event) {
     initWebSocket();
@@ -202,6 +241,23 @@ const char index_html[] PROGMEM = R"rawliteral(
       }
     });
   }
+
+  function setMotorSpeed()  {
+    let power = Number(document.getElementById('motorPower').value);
+
+    // checking validity of speed 
+    if (!Number.isInteger(power) || power < 0 || power > 100) {
+      alert("Invalid entry.");
+      return; 
+    }
+
+    // setting up message format like "P:10" where 10 is the power 
+    if (websocket.readyState === WebSocket.OPEN) {
+      websocket.send("P:" + power);
+
+      document.getElementById('speedStatus').innerHTML = "Current power: " + power + "%";
+    }
+  }
   function toggle(num){
     websocket.send('toggle'+num);
   }
@@ -210,33 +266,8 @@ const char index_html[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
-//Makes function notifyCLients which sends the updated status of the elements 
-// specifically the status of motor 1, 2, 3, 4
-void notifyClients() {
-  ws.textAll(String(Motor1State)+" : " String(+Motor2State)+" : " + String(Motor3State)+" : "+String(Motor4State)+);
-}
 
-void moveForward() {
-  Motors[1] -> run(FORWARD)
-  Motors[2] -> run(FORWARD)
-}
-
-void moveBackward(){
-  Motors[1] -> run(BACKWARD)
-  Motors[2] -> run(BACKWARD)
-}
-
-void turnLeft() {
-  Motors[1] -> run(BACKWARD)
-  Motors[2] -> run(FOWARD)
-}
-
-void turnRight() {
-  Motors[1] -> run(FORWARD)
-  Motors[2] -> run(BACKWARD)
-}
-
-//handles the messages from the web socket
+// reads messages and translates them to motor controller 
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   AwsFrameInfo *info = (AwsFrameInfo*)arg;
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
@@ -251,8 +282,15 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
 
     char key = message[0];
 
+    // check for "P" from message instead of "W", "A", "S", or "D"
+    if (key == 'P') {      
+      motorPower = constrain(atoi(message + 2), 0, 100);
+      updateDriveMotors(); 
+      return; 
+    }
+
     // check index 2 to get 0 or 1, telling us whether keyup or keydown
-    int pressed = atoi(message + 2);
+    bool pressed = atoi(message + 2);
 
     // wasd controls 
     switch (key) {
@@ -260,57 +298,48 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       case 'A': keyA = pressed; break; 
       case 'S': keyS = pressed; break; 
       case 'D': keyD = pressed; break; 
+      default: return; 
     }
 
-    if (keyW) {
-      resetMotorSpeed();
-      moveForward();
-    } else if (keyS) {
-      resetMotorSpeed(); 
-      moveBackward(); 
-    } else if (keyA) {
-      resetMotorSpeed(); 
-      turnLeft(); 
-    } else if (keyD) {
-      resetMotorSpeed(); 
-      turnRight(); 
-    } else if (keyW && keyA) {
-      resetMotorSpeed(); 
-      changeMotor(1, motorPower/2)
-      moveForward(); 
-
-    } else if (keyW && keyD) {
-      resetMotorSpeed(); 
-      changeMotor(2, motorPower/2)
-      moveForward(); 
-
-    } else if (keyS && keyA) {
-      resetMotorSpeed(); 
-      changeMotor(1, motorPower/2);
-      moveBackward(); 
-
-    } else if (keyS && keyD) {
-      resetMotorSpeed(); 
-      changeMotor(2, motorPower/2); 
-      moveBackward(): 
-    }
-    else {
-      Motors[1] -> run(RELEASE)
-      Motors[2] -> run(RELEASE)
-    }
+    updateDriveMotors(); 
   }
 }
+
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+  if (type == WS_EVT_DATA) {
+    handleWebSocketMessage(arg, data, len);
+  }
+}
+
+void moveForward() {
+  Motors[1] -> run(FORWARD);
+  Motors[2] -> run(FORWARD);
+}
+
+void moveBackward(){
+  Motors[1] -> run(BACKWARD);
+  Motors[2] -> run(BACKWARD);
+}
+
+void turnLeft() {
+  Motors[1] -> run(BACKWARD);
+  Motors[2] -> run(FORWARD);
+}
+
+void turnRight() {
+  Motors[1] -> run(FORWARD);
+  Motors[2] -> run(BACKWARD);
+}
+
 
 // Create the Motor shield object with the default I2C address
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 // Or, create it with a different I2C address (say for stacking)
 // Adafruit_MotorShield AFMS = Adafruit_MotorShield(0x61);
 
-// Select which 'port' M1, M2, M3 or M4. In this case, M1
-Adafruit_DCMotor *Motor1 = AFMS.getMotor(1);
 
 // Function to handle the root URL and show the current states
-void handleRoot() {
+void handleRoot(AsyncWebServerRequest *request) {
   String html = "<!DOCTYPE html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
   html += "<link rel=\"icon\" href=\"data:,\">";
   html += "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}";
@@ -335,15 +364,13 @@ void handleRoot() {
   }
 */
   html += "</body></html>";
-  server.send(200, "text/html", html);
+
+  // replaced old syntax with new asynchronous syntax 
+  request->send(200, "text/html", html);
 }
 
 void setup() {
   Serial.begin(115200);
-  Motors[1] = AFMS.getMotor(1); // left
-  Motors[2] = AFMS.getMotor(2); // right
-  Motors[3] = AFMS.getMotor(3); // auger
-  Motors[4] = AFMS.getMotor(4); // disperse motor
 
  /* // Initialize the output variables as outputs
   pinMode(output26, OUTPUT);
@@ -360,8 +387,15 @@ void setup() {
     Serial.println("Could not find Motor Shield. Check wiring.");
     while (1);
   }
+
+  Motors[1] = AFMS.getMotor(1); // left
+  Motors[2] = AFMS.getMotor(2); // right
+  Motors[3] = AFMS.getMotor(3); // auger
+  Motors[4] = AFMS.getMotor(4); // disperse motor
+
   //set Motor speed
-  changeMotor(1, 58)
+  setMotor(1, 0);
+  setMotor(2, 0);
 
   //Creates wifi
   WiFi.mode(WIFI_AP);
@@ -372,12 +406,16 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   // Set up the web server to handle different routes
-  server.on("/", handleRoot);
-  server.on("/1/on", handleMotor1On);
-  server.on("/1/off", handleMotor1Off);
-  /*server.on("/2/on", handleGPIO27On);
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+  request->send_P(200, "text/html", index_html);
+  });  
+
+/*server.on("/2/on", handleGPIO27On);
   server.on("/2/off", handleGPIO27Off);
   */
+
+  // send messages when anything happens 
+  ws.onEvent(onEvent);
 
   // attach websocket handler to server 
   server.addHandler(&ws);
