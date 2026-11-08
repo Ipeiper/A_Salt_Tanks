@@ -1,8 +1,7 @@
-#include <WiFi.h>
-#include <WebServer.h>
-#include <Adafruit_MotorShield.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
+#include <WiFi.h> // esp32 wi-fi access point 
+#include <Adafruit_MotorShield.h> // motorshield 
+#include <AsyncTCP.h> // asynchronous TCP connection
+#include <ESPAsyncWebServer.h> // webpage host and Websocket
 
 // Replace with your network credentials
 const char* ssid = "A_SALT_TANK_1";
@@ -11,11 +10,14 @@ const char* password = "123456789";
 // creates state variable
 int Motor1State = 0;//Left
 int Motor2State = 0;//Right
-int Motor3State = 0;//Augar
+int Motor3State = 0;//Auger
 int Motor4State = 0;//Disperser
 
+// the motors themselves
+Adafruit_DCMotor *Motors[5];
+
 //Creates an asyncronious web server, allowing multiple paralell connections
-AsyncWebServer server(80);
+AsyncWebServer server(80); // hosts webpage at esp32 ip address
 AsyncWebSocket ws("/ws");
 
 
@@ -131,21 +133,47 @@ const char index_html[] PROGMEM = R"rawliteral(
   }
   function onMessage(event) {
     int[] states = new int[9];//creates a 9 element array containing the values of each state
-    var id = Number(events.data.slice(0,1)[0]);
-    var value = Number(events.data.slice(1,3));//should get the first index and second index
+    var id = Number(event.data.slice(0,1)[0]);
+    var value = Number(event.data.slice(1,3));//should get the first index and second index
     state[id] = value;
 
     document.getElementById('state'+id).innerHTML = state[id];
   }
   function onLoad(event) {
     initWebSocket();
-    initButton(1);
-    initButton(2);
-    initButton(3);
-    initButton(4);
+    initKeyboard(); 
   }
+
   function initButton(num) {
-    document.getElementById('button'+num).addEventListener('click', toggle(num)); // need to change num so that this part actually works
+    document.getElementById('button'+num).addEventListener('click', () => toggle(num)); // need to change num so that this part actually works
+  }
+
+  function initKeyboard() {
+
+    document.addEventListener('keydown', function(event) {
+
+      let key = event.key.toLowerCase();
+
+      if (['w', 'a', 's', 'd'].includes(key)) {
+        event.preventDefault();
+
+        // Send key pressed
+        if (!event.repeat) {
+          websocket.send(key.toUpperCase() + ":1");
+        }
+      }
+    });
+
+    document.addEventListener('keyup', function(event) {
+
+      let key = event.key.toLowerCase();
+
+      if (['w', 'a', 's', 'd'].includes(key)) {
+        event.preventDefault();
+
+        websocket.send(key.toUpperCase() + ":0");
+      }
+    });
   }
   function toggle(num){
     websocket.send('toggle'+num);
@@ -158,28 +186,72 @@ const char index_html[] PROGMEM = R"rawliteral(
 //Makes function notifyCLients which sends the updated status of the elements 
 // specifically the status of motor 1, 2, 3, 4
 void notifyClients() {
-  ws.textAll(String(Motor1State)+" : "+Motor2State)+" : "+Motor3State)+" : "+Motor4State)+);
+  ws.textAll(String(Motor1State)+" : " String(+Motor2State)+" : " + String(Motor3State)+" : "+String(Motor4State)+);
+}
+
+void moveForward() {
+  Motors[1] -> run(FORWARD)
+  Motors[2] -> run(FORWARD)
+}
+
+void moveBackward(){
+  Motors[1] -> run(BACKWARD)
+  Motors[2] -> run(BACKWARD)
+}
+
+void turnLeft() {
+  Motors[1] -> run(BACKWARD)
+  Motors[2] -> run(FOWARD)
+}
+
+void turnRight() {
+  Motors[1] -> run(FORWARD)
+  Motors[2] -> run(BACKWARD)
 }
 
 //handles the messages from the web socket
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   AwsFrameInfo *info = (AwsFrameInfo*)arg;
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
-    data[len] = 0;
-    char *str = (char *)data;
-    int num;
-    //this part makes sure the message is one of the toggles
-  if (sscanf(str, "toggle%d", &num) == 1)
-  {
+    char message[16];
 
-    changeMotor():
-    notifyClients();
-  }
-    if (strcmp((char*)data, "toggle") == 0) {
-      ledState = !ledState;
-      
+    if (len >- sizeof(message)) return; 
+
+    memcpy(message, data, len);
+    
+    // NEED to indicate where the string ends with \0 for atoi (ascii to int)
+    message[len] = '\0';
+
+    char key = message[0];
+
+    // check index 2 to get 0 or 1, telling us whether keyup or keydown
+    int pressed = atoi(message + 2);
+    
+    if (pressed == 0) {
+      Motors[1] -> run(RELEASE)
+      Motors[2] -> run(RELEASE)
+      return; 
     }
-  }
+
+    // wasd controls 
+    switch (key) {
+      case 'W':
+        moveForward(); 
+        break; 
+      
+      case 'S': 
+        moveBackward(); 
+        break; 
+
+      case 'A':
+        turnLeft(); 
+        break; 
+        
+      case 'D': 
+        turnRight(); 
+        break; 
+
+    }
 }
 
 // Create the Motor shield object with the default I2C address
@@ -190,14 +262,21 @@ Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 // Select which 'port' M1, M2, M3 or M4. In this case, M1
 Adafruit_DCMotor *Motor1 = AFMS.getMotor(1);
 
-//creates 9 length arry to hold the motor state values
-int MotorState[] = {0,0,0,0,0,0,0,0,0};
+// adjusting motor speed separately (maybe slider?)
+int MotorState = 50; 
+
+bool MotorRunning[5] = {false}
 
 //this changes the motors state depending on the id of the motor and its value
 void changeMotor(id,value){
 
+  // invalid cases 
+  if (id < 1 || id > 4) return; 
+  
+  // converts the 0 to 99 power percentage to 0 to 255 for motors
+  int speed = map(value, 0, 99, 0, 255)
+  Motors[id] -> setSpeed(value)
 }
-
 
 
 // Function to handle the root URL and show the current states
@@ -231,6 +310,10 @@ void handleRoot() {
 
 void setup() {
   Serial.begin(115200);
+  Motors[1] = AFMS.getMotor(1); // left
+  Motors[2] = AFMS.getMotor(2); // right
+  Motors[3] = AFMS.getMotor(3); // auger
+  Motors[4] = AFMS.getMotor(4); // disperse motor
 
  /* // Initialize the output variables as outputs
   pinMode(output26, OUTPUT);
@@ -266,6 +349,10 @@ void setup() {
   server.on("/2/off", handleGPIO27Off);
   */
 
+  // attach websocket handler to server 
+  server.addHandler(&ws);
+
+  
   // Start the web server
   server.begin();
   Serial.println("HTTP server started");
@@ -273,5 +360,5 @@ void setup() {
 
 void loop() {
   // Handle incoming client requests
-  server.handleClient();
+  ws.cleanupClients(); 
 }
