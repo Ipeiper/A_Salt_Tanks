@@ -1,5 +1,4 @@
 #include <WiFi.h> // esp32 wi-fi access point 
-#include <Adafruit_MotorShield.h> // motorshield 
 #include <AsyncTCP.h> // asynchronous TCP connection
 #include <Wire.h> // I2C communication
 #include <ESPAsyncWebServer.h> // webpage host and Websocket
@@ -13,9 +12,6 @@ int Motor1State = 0;//Left
 int Motor2State = 0;//Right
 int Motor3State = 0;//Auger
 int Motor4State = 0;//Disperser
-
-// the motors themselves
-Adafruit_DCMotor *Motors[5];
 
 // individual key state, need to be global so we don't have to check 
 // for the states of the keys being pressed in loop, only when webpage
@@ -34,14 +30,28 @@ bool MotorRunning[5] = {false};
 void setMotor(int id, int speed) {
   speed = constrain(speed, -255, 255);
 
-  Motors[id] -> setSpeed(abs(speed));
+  int RPWM, LPWM; 
+
+  if (id == 1) {
+    RPWM = M1_RPWM; 
+    LPWM = M1_LPWM; 
+  } else if (id == 2) {
+    RPWM = M2_RPWM; 
+    LPWM = M2_LPWM; 
+  } else {
+    return; 
+  }
+
 
   if (speed > 0) {
-    Motors[id] -> run(FORWARD);
+    analogWrite(LPWM, 0);
+    analogWrite(RPWM, speed);
   } else if (speed < 0) {
-    Motors[id] -> run(BACKWARD);
+    analogWrite(RPWM, 0);
+    analogWrite(LPWM, abs(speed));
   } else {
-    Motors[id] -> run(RELEASE);
+    analogWrite(RPWM, 0);
+    analogWrite(LPWM, 0);
   }
 }
 
@@ -198,12 +208,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     setTimeout(initWebSocket, 2000);
   }
   function onMessage(event) {
-    let states = [0,0,0,0,0,0,0,0,0]; //creates a 9 element array containing the values of each state
-    var id = Number(event.data.slice(0,1)[0]);
-    var value = Number(event.data.slice(1,3));//should get the first index and second index
-    states[id] = value;
-
-    document.getElementById('states'+id).innerHTML = state[id];
+    // nothing currently 
   }
   function onLoad(event) {
     initWebSocket();
@@ -311,87 +316,42 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
   }
 }
 
-void moveForward() {
-  Motors[1] -> run(FORWARD);
-  Motors[2] -> run(FORWARD);
-}
+// Motor 1 - Left
+const int M1_R_EN = 32; 
+const int M1_L_EN = 33; 
+const int M1_RPWM = 25; 
+const int M1_LPWM = 26; 
 
-void moveBackward(){
-  Motors[1] -> run(BACKWARD);
-  Motors[2] -> run(BACKWARD);
-}
+// ALL PINS TBD, GENERAL ASSUMPTION 
+//Motor 2 - Right
+const int M2_R_EN = 27; 
+const int M2_L_EN = 14; 
+const int M2_RPWM = 18; 
+const int M2_LPWM = 19; 
 
-void turnLeft() {
-  Motors[1] -> run(BACKWARD);
-  Motors[2] -> run(FORWARD);
-}
-
-void turnRight() {
-  Motors[1] -> run(FORWARD);
-  Motors[2] -> run(BACKWARD);
-}
-
-
-// Create the Motor shield object with the default I2C address
-Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 // Or, create it with a different I2C address (say for stacking)
 // Adafruit_MotorShield AFMS = Adafruit_MotorShield(0x61);
-
-
-// Function to handle the root URL and show the current states
-void handleRoot(AsyncWebServerRequest *request) {
-  String html = "<!DOCTYPE html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
-  html += "<link rel=\"icon\" href=\"data:,\">";
-  html += "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}";
-  html += ".button { background-color: #4CAF50; border: none; color: white; padding: 16px 40px; text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}";
-  html += ".button2 { background-color: #555555; }</style></head>";
-  html += "<body><h1>ESP32 Web Server</h1>";
-
-  // Display GPIO 26 controls
-  html += "<p> Motor 1 - State " + Motor1State + "</p>";
-  if (Motor1State == "off") {
-    html += "<p><a href=\"/1/on\"><button class=\"button\">ON</button></a></p>";
-  } else {
-    html += "<p><a href=\"/1/off\"><button class=\"button button2\">OFF</button></a></p>";
-  }
-
-  /*// Display GPIO 27 controls
-  html += "<p>GPIO 27 - State " + output27State + "</p>";
-  if (output27State == "off") {
-    html += "<p><a href=\"/27/on\"><button class=\"button\">ON</button></a></p>";
-  } else {
-    html += "<p><a href=\"/27/off\"><button class=\"button button2\">OFF</button></a></p>";
-  }
-*/
-  html += "</body></html>";
-
-  // replaced old syntax with new asynchronous syntax 
-  request->send(200, "text/html", html);
-}
 
 void setup() {
   Serial.begin(115200);
 
- /* // Initialize the output variables as outputs
-  pinMode(output26, OUTPUT);
-  pinMode(output27, OUTPUT);
-  // Set outputs to LOW
-  digitalWrite(output26, LOW);
-  digitalWrite(output27, LOW);
-*/
-  //starts the pins the motor shield uses
-  Wire.begin(21, 22);
+  // Configure motor driver pins
+  pinMode(M1_R_EN, OUTPUT);
+  pinMode(M1_L_EN, OUTPUT);
+  pinMode(M1_RPWM, OUTPUT);
+  pinMode(M1_LPWM, OUTPUT);
 
-  if (!AFMS.begin()) {         // create with the default frequency 1.6KHz
-  // if (!AFMS.begin(1000)) {  // OR with a different frequency, say 1KHz
-    Serial.println("Could not find Motor Shield. Check wiring.");
-    while (1);
-  }
+  pinMode(M2_R_EN, OUTPUT);
+  pinMode(M2_L_EN, OUTPUT);
+  pinMode(M2_RPWM, OUTPUT);
+  pinMode(M2_LPWM, OUTPUT);
 
-  Motors[1] = AFMS.getMotor(1); // left
-  Motors[2] = AFMS.getMotor(2); // right
-  Motors[3] = AFMS.getMotor(3); // auger
-  Motors[4] = AFMS.getMotor(4); // disperse motor
+  // Enable both motor drivers
+  digitalWrite(M1_R_EN, HIGH);
+  digitalWrite(M1_L_EN, HIGH);
+
+  digitalWrite(M2_R_EN, HIGH);
+  digitalWrite(M2_L_EN, HIGH);
 
   //set Motor speed
   setMotor(1, 0);
