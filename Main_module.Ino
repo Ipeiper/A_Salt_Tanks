@@ -132,19 +132,20 @@ Serial2.begin(9600,SERIAL_8N1,16,17);
 }
 
 void loop(){
-    //start for dynamic timing
-    start_time = millis();
+  //start for dynamic timing
+  start_time = millis();
 
-    //Reads the serial connection
-    if (Serial2.available()) {
+  //Reads the serial connection
+  if (Serial2.available()) {
     String data = Serial2.readStringUntil('\n');
     keyW=(data[0] == 1 ) ? true: false;
     keyA=(data[1] == 1 ) ? true: false;
     keyS=(data[2] == 1 ) ? true: false;
     keyD=(data[3] == 1 ) ? true: false;
+    motorPower=int(data.substring(4,7));
     updateDriveMotors();
 
-    }
+  }
 
-    delay ((millis()-start_time<SPT) ? SPT-(millis()-start_time): 0 );
+  delay ((millis()-start_time<SPT) ? SPT-(millis()-start_time): 0 );
 }

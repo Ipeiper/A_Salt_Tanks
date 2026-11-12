@@ -2,6 +2,7 @@
 
 #include "esp_camera.h"
 #include <WiFi.h>
+#include <math.h>
 
 //
 // WARNING!!! Make sure that you have either selected ESP32 Wrover Module,
@@ -82,12 +83,26 @@ void startCameraServer();
 
 //Function that sends the current state of the keys to the main board
 // the arguements are the true false states of the buttons they are associated with
-void sendButtonStates(W,A,S,D){
-    int keyW= (W) ? "1" : "0";
-    int keyA= (A) ? "1" : "0";
-    int keyS= (S) ? "1" : "0";
-    int keyD= (D) ? "1" : "0";    
-    Serial2.println(keyW+keyA+keyS+keyD);
+//uses a communication format of strings with the first 4 characters devoted to the bool state of the keys WASD
+// then the next 3 charcters are the motor power from 000-100
+void sendButtonStates(W,A,S,D,motorpower){
+    string keyW= (W) ? "1" : "0";
+    string keyA= (A) ? "1" : "0";
+    string keyS= (S) ? "1" : "0";
+    string keyD= (D) ? "1" : "0";
+    // constrains motor power to within the bounds of 100 and 0 and to an int out of an abundance of caution
+    con_motorpower=constrain(roundf(motorpower,0,100));
+    //ensures that motor power is stored as a 3 character long string
+    if (con_motorpower==99){
+      string mpower = string(con_motorpower);
+    }
+    else if (con_motorpower<10) {
+      string mpower = "00"+string(con_motorpower);
+    }
+    else{
+      string mpower = "0"+string(con_motorpower);
+    }
+    Serial2.println(keyW+keyA+keyS+keyD+mpower);
 }
 
 
