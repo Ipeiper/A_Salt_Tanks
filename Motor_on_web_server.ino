@@ -39,6 +39,8 @@ void setMotor(int id, int speed) {
 
   int RPWM, LPWM; 
 
+  // we don't have motor pointers without the shield, so manually set the PWM pins depending on the ID
+  // id == 1 is left motor, id == 2 is right motor
   if (id == 1) {
     RPWM = M1_RPWM; 
     LPWM = M1_LPWM; 
@@ -50,6 +52,10 @@ void setMotor(int id, int speed) {
   }
 
 
+  // translated code to raw esp32 library code, no longer shield
+  // RPWM is run forward, LPWM is run backward, ALWAYS MAKE SURE ONE IS OFF WHEN RUNNING THE OTHER
+  // WILL EXPLODE AND DIE IF BOTH ARE RUNNING AT THE SAME TIME. WE DON'T HAVE ENOUGH MOTORS TO BE DOING 
+  // ANYMORE BS 
   if (speed > 0) {
     analogWrite(LPWM, 0);
     analogWrite(RPWM, speed);
@@ -63,6 +69,7 @@ void setMotor(int id, int speed) {
 }
 
 void updateDriveMotors() {
+  // translate power to speed 
   int speed = map(motorPower, 0, 100, 0, 255);
 
   int leftSpeed = 0; 
@@ -227,9 +234,10 @@ const char index_html[] PROGMEM = R"rawliteral(
   }
 
   function initButton(num) {
-    document.getElementById('button'+num).addEventListener('click', () => toggle(num)); // need to change num so that this part actually works
+    document.getElementById('button'+num).addEventListener('click', () => toggle(num));
   }
 
+  // allows key presses to be read, specifically just WASD
   function initKeyboard() {
 
     document.addEventListener('keydown', function(event) {
@@ -239,7 +247,8 @@ const char index_html[] PROGMEM = R"rawliteral(
       if (['w', 'a', 's', 'd'].includes(key)) {
         event.preventDefault();
 
-        // Send key pressed
+        // this is where the message sent to the board is created 
+        // collects direction and sends 1 for KEYDOWN
         if (!event.repeat) {
           websocket.send(key.toUpperCase() + ":1");
         }
@@ -249,7 +258,9 @@ const char index_html[] PROGMEM = R"rawliteral(
     document.addEventListener('keyup', function(event) {
 
       let key = event.key.toLowerCase();
-
+      
+      // this is where the message sent to the board is created 
+      // collects direction and sends 0 for KEYUP
       if (['w', 'a', 's', 'd'].includes(key)) {
         event.preventDefault();
 
@@ -299,17 +310,21 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
     char key = message[0];
 
     // check for "P" from message instead of "W", "A", "S", or "D"
+    // specific message check for when the motor speed is changed. Format: "P:50" or "P:23"
+    // "P" to differentiate from W, A, S, or D and the other two values indicate the specific power
     if (key == 'P') {      
       motorPower = constrain(atoi(message + 2), 0, 100);
       updateDriveMotors(); 
       return; 
     }
 
-    // check index 2 to get 0 or 1, telling us whether keyup or keydown
+    // check index 2 to get 0 or 1, telling us whether keyup or keydown (pressed or not)
     bool pressed = atoi(message + 2);
 
     // wasd controls 
     switch (key) {
+      // sets keyX values to their respective boolean depending on message received from web server 
+      // format: "W:1" or "S:0", first key indicating direction, value meaning pressed or not
       case 'W': keyW = pressed; break; 
       case 'A': keyA = pressed; break; 
       case 'S': keyS = pressed; break; 
@@ -321,24 +336,24 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   }
 }
 
+// when message received... read message 
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
   if (type == WS_EVT_DATA) {
     handleWebSocketMessage(arg, data, len);
   }
 }
 
-// Or, create it with a different I2C address (say for stacking)
-// Adafruit_MotorShield AFMS = Adafruit_MotorShield(0x61);
-
 void setup() {
   Serial.begin(115200);
 
   // Configure motor driver pins
+  // left motor 
   pinMode(M1_R_EN, OUTPUT);
   pinMode(M1_L_EN, OUTPUT);
   pinMode(M1_RPWM, OUTPUT);
   pinMode(M1_LPWM, OUTPUT);
 
+  // right motor pins
   pinMode(M2_R_EN, OUTPUT);
   pinMode(M2_L_EN, OUTPUT);
   pinMode(M2_RPWM, OUTPUT);
