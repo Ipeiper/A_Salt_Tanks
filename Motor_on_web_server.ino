@@ -7,11 +7,18 @@
 const char* ssid = "A_SALT_TANK_1";
 const char* password = "123456789";
 
-// creates state variable
-int Motor1State = 0;//Left
-int Motor2State = 0;//Right
-int Motor3State = 0;//Auger
-int Motor4State = 0;//Disperser
+// Motor 1 - Left
+const int M1_R_EN = 32; 
+const int M1_L_EN = 33; 
+const int M1_RPWM = 25; 
+const int M1_LPWM = 26; 
+
+// ALL PINS TBD, GENERAL ASSUMPTION 
+//Motor 2 - Right
+const int M2_R_EN = 21; 
+const int M2_L_EN = 22; 
+const int M2_RPWM = 27; 
+const int M2_LPWM = 13; 
 
 // individual key state, need to be global so we don't have to check 
 // for the states of the keys being pressed in loop, only when webpage
@@ -62,21 +69,25 @@ void updateDriveMotors() {
   int rightSpeed = 0;
 
   if (keyW) {
+    Serial.println("up");
     leftSpeed += speed; 
     rightSpeed += speed; 
   }
 
   if (keyS) {
+    Serial.println("down");
     leftSpeed -= speed;
     rightSpeed -= speed; 
   }
 
   if (keyA) {
+    Serial.println("left");
     leftSpeed -= speed; 
     rightSpeed += speed; 
   }
 
   if (keyD) {
+    Serial.println("right");
     leftSpeed += speed; 
     rightSpeed -= speed; 
   }
@@ -316,19 +327,6 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
   }
 }
 
-// Motor 1 - Left
-const int M1_R_EN = 32; 
-const int M1_L_EN = 33; 
-const int M1_RPWM = 25; 
-const int M1_LPWM = 26; 
-
-// ALL PINS TBD, GENERAL ASSUMPTION 
-//Motor 2 - Right
-const int M2_R_EN = 27; 
-const int M2_L_EN = 14; 
-const int M2_RPWM = 18; 
-const int M2_LPWM = 19; 
-
 // Or, create it with a different I2C address (say for stacking)
 // Adafruit_MotorShield AFMS = Adafruit_MotorShield(0x61);
 
@@ -362,8 +360,8 @@ void setup() {
   WiFi.softAP(ssid, password);
   Serial.println("");
   Serial.println("WiFi connected.");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
+  Serial.print("AP IP address: ");
+  Serial.println(WiFi.softAPIP());
 
   // Set up the web server to handle different routes
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
