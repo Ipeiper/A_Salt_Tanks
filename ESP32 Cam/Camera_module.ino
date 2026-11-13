@@ -3,6 +3,7 @@
 #include "esp_camera.h"
 #include <WiFi.h>
 #include <math.h>
+#include <WebSocketsServer.h>
 
 //
 // WARNING!!! Make sure that you have either selected ESP32 Wrover Module,
@@ -81,6 +82,22 @@ const char* password = "123456789";
 
 void startCameraServer();
 
+WebSocketsServer webSocket = WebSocketsServer(81);
+
+//handles the websocket messages on the camera side
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+  if (type == WStype_TEXT){
+    //takes data from the message to pass onto main module
+    //might need to change depending on what the data is passed as
+    keyW=data[0];
+    keyA=data[1];
+    keyS=data[2];
+    keyD=data[3];
+    motorpowerdata.substring(4,7)
+    sendButtonStates(W,A,S,D,motorpower);
+  }
+}
+
 //Function that sends the current state of the keys to the main board
 // the arguements are the true false states of the buttons they are associated with
 //uses a communication format of strings with the first 4 characters devoted to the bool state of the keys WASD
@@ -112,6 +129,9 @@ void setup() {
   Serial.println();
   //Open Serial port for cam & main communication
   Serial2.begin(9600,SERIAL_8N1,16,17);
+  //Begins the websocket connection and how to manage it
+  webSocket.begin();
+  webSocket.onEvent(webSocketEvent);
 
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -174,5 +194,5 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  delay(10000);
+  webSocket.loop();
 }
