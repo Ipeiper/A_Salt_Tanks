@@ -1,6 +1,20 @@
 //File containing the code to be uploaded to the main esp32 board, also known as the brain
 // Currently, this handles controlling the motors and recieving signals using serial from the cam
 
+#include <WiFi.h>
+
+// Wifi network hosted by this board
+const char* ssid = "A_SALT_TANK_1";
+const char* password = "123456789";
+
+// Serial link to the cam
+// Wiring: cam GPIO14 (TX) -> UART_RX_PIN here, cam GPIO13 (RX) <- UART_TX_PIN here, and GND <-> GND
+const int UART_RX_PIN = 16;
+const int UART_TX_PIN = 17;
+const long UART_BAUD = 9600;   // must match the cam
+
+// stop motors if cam isn't communicating
+const unsigned long CAM_TIMEOUT_MS = 500; 
 
 // ALL PINS TBD, GENERAL ASSUMPTION
 
@@ -17,7 +31,7 @@ const int M2_RPWM = 27;
 const int M2_LPWM = 13; 
 
 // individual key state, need to be global so we don't have to check 
-// for the states of the keys being pressed in loop, only when webpage
+// for the states of the keys being pressed in loop, only when camera
 // sends message that the state has changed (pressed or released) 
 bool keyW = false; 
 bool keyA = false; 
@@ -25,13 +39,14 @@ bool keyS = false;
 bool keyD = false; 
 
 //
-int motorPower = 50; 
-bool MotorRunning[5] = {false};
+int motorPower = 20; 
 
-//maximum ticks per second Rate
-int TPS = 100;
-int SPT = 1000/TPS;
-int start_time;
+// keep track of when the last valid message was from when the cam arrived
+unsigned long lastMsgMs = 0; 
+
+// for future message to be received from camera
+char lineBuf[16];
+uint8_t lineLen = 0; 
 
 //Function that sets the motor values
 void setMotor(int id, int speed) {
@@ -100,13 +115,73 @@ void updateDriveMotors() {
 
 }
 
+// sets new state and only touches motors if there's been a change 
+void applyState(bool w, bool a, bool s, bool d, int power) {
+  if (w == keyW && a == keyA && s == keyS && d == keyD && power == motorPower) return; 
 
+  keyW = w; 
+  keyA = a; 
+  keyS = s; 
+  keyD = d; 
+  motorPower = power; 
+
+  Serial.printf("W%d A%d S%d D%d power %d\n", keyW, keyA, keyS, keyD, motorPower);
+  updateDriveMotors(); 
+}
+
+// handle that line from the camera EX: "1000050"
+void handleLine(const char* line) {
+  //check for valid length 
+  if (strlen(line) != 7) return; 
+
+  for (int i = 0; i < 4; i++) {
+    if (line[i] != '0' && line[i] != '1') return; 
+  }
+
+  for (int i = 4; i < 7; i++) {
+    if (line[i] < '0' || line[i] > '9') return; 
+  }
+
+  // avoided any invalid values, now set them to power and wasd
+  // ASCII subtraction 
+
+  // get power
+  int power = (line[4] - '0') * 100 + (line[5] - '0') * 10 + (line[6] - '0'); 
+  power = constrain(power, 0, 100);
+
+  lastMsgMs = millis(); 
+
+  // get and apply wasd + apply power 
+  applyState(line[0] == '1', line[1] == '1', line[2] == '1', line[3] == '1', power);
+}
+
+// process line received from camera 
+void readCam() {
+  while (Serial2.available()) {
+    char c = Serial2.read(); 
+
+    // the end of a line 
+    if (c == '\n') {
+      lineBuf[lineLen] = '\0';
+      handleLine(lineBuf);
+      lineLen = 0; 
+    } 
+
+    // the start of a line 
+    else if( c!= '\r') {
+      if (lineLen < sizeof(lineBuf) - 1) {
+        lineBuf[lineLen++] = c; 
+      } else {
+        lineLen = 0; // way too long, ignore line 
+      }
+    }
+  }
+}
 
 void setup() {
-Serial.begin(115200);
-//Open Serial port for cam & main communication
-Serial2.begin(9600,SERIAL_8N1,16,17);
-
+  Serial.begin(115200);
+  //Open Serial port for cam & main communication
+  Serial2.begin(UART_BAUD, SERIAL_8N1, UART_RX_PIN, UART_TX_PIN);
   // Configure motor driver pins
   pinMode(M1_R_EN, OUTPUT);
   pinMode(M1_L_EN, OUTPUT);
@@ -129,23 +204,22 @@ Serial2.begin(9600,SERIAL_8N1,16,17);
   setMotor(1, 0);
   setMotor(2, 0);
 
+  // host wifi so cam can join it 
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(ssid, password);
+  Serial.println("");
+  Serial.print("WiFi network up. AP IP address: ");
+  Serial.println(WiFi.softAPIP());
+
 }
-
+  
 void loop(){
-  //start for dynamic timing
-  start_time = millis();
+  readCam(); 
 
-  //Reads the serial connection
-  if (Serial2.available()) {
-    String data = Serial2.readStringUntil('\n');
-    keyW=(data[0] == 1 ) ? true: false;
-    keyA=(data[1] == 1 ) ? true: false;
-    keyS=(data[2] == 1 ) ? true: false;
-    keyD=(data[3] == 1 ) ? true: false;
-    motorPower=int(data.substring(4,7));
-    updateDriveMotors();
-
+  // failsafe 
+  if (millis() - lastMsgMs > CAM_TIMEOUT_MS) {
+    applyState(false, false, false, false, motorPower);
   }
 
-  delay ((millis()-start_time<SPT) ? SPT-(millis()-start_time): 0 );
+  
 }
