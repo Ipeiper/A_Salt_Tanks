@@ -3,8 +3,31 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>ESP32 OV2460</title>
+        <title>ESP32 OV2640</title>
         <link rel="stylesheet" href="style.css">
+
+        <style>
+            #drive { margin: 12px 0; text-align: center; -webkit-user-select: none; user-select: none; }
+            #drive h4 { margin: 0 0 6px; }
+            #ws-status { font-size: 13px; margin-bottom: 10px; }
+            #ws-status.on { color: #4caf50; }
+            #ws-status.off { color: #e53935; }
+            #drive .dpad { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 64px); gap: 6px; justify-content: center; }
+            #drive .dpad button { width: 64px; height: 64px; margin: 0; padding: 0; font-size: 22px; font-weight: bold; line-height: 1; color: #fff; 
+            background: #3a3a3a; border: 0; border-radius: 8px; cursor: pointer; touch-action: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+            #drive .dpad button.active { background: #ff3034; transform: translateY(2px); }
+            #key-w { grid-column: 2; grid-row: 1; }
+            #key-a { grid-column: 1; grid-row: 2; }
+            #key-s { grid-column: 2; grid-row: 2; }
+            #key-d { grid-column: 3; grid-row: 2; }
+            #drive .power { margin-top: 14px; }
+            #drive .power input[type=number] { width: 70px; padding: 4px; font-size: 16px; text-align: center; }
+
+            /* for wide screens, have teh drive panel float in the corner */ 
+            @media (min-width: 800px) and (orientation: landscape) {
+                #drive { position: fixed; right: 12px; bottom: 12px; margin: 0; padding: 10px 14px; background: rgba(54, 54, 54, 0.9); border-radius: 8px; z-index: 10; }
+            }
+        </style>
     </head>
     <body>
         <!-- Page layout: [toggle button] + [settings sidebar] + [video/still image] -->
@@ -223,6 +246,21 @@
                     </div>
                 </figure>
             </div>
+            <div id = "drive">
+                <h4>Drive</h4>
+                <div id = "ws-status" class = "off"> Controls: disconnected </div>
+                <div class = "dpad">
+                    <button id = "key-w" type = "button">W</button>
+                    <button id = "key-a" type = "button">A</button>
+                    <button id = "key-s" type = "button">S</button>
+                    <button id = "key-d" type = "button">D</button>
+                </div>
+                <div class = "power">
+                    <label for = "drive-power">Speed (0-100)</label>
+                    <input type="number" id = "drive-power" min ="0" max="100" step="1" value="20">
+                    <span>%</span>
+                </div>
+            </div> 
         </section>
         <script src="script.js"></script>
     </body>

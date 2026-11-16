@@ -240,4 +240,121 @@ document.addEventListener('DOMContentLoaded', function () {
       disable(faceEnrollBtn);
     }
   };
+
+  // added script for keys and keyboard 
+  (function () {
+    const WS_PORT = 82; 
+    const SEND_MS = 100; 
+    const KEYS = ['w', 'a', 's', 'd'];
+    const keys = {w: false, a: false, s: false, d: false };
+
+    const statusEl = document.getElementById('ws-status');
+    const powerEl = document.getElementById('drive-power');
+    let ws = null; 
+
+    function setStatus(connected) {
+      if (!statusEl) return; 
+      statusEl.textContent = connected ? 'Controls: connected' : 'Controls: disconnected';
+      statusEl.className = connected ? 'on' : 'off';
+    }
+
+    function getPower() {
+      // checking for invalid values 
+      return Math.max(0, Math.min(100, parseInt(powerEl.value,10) || 0));
+    }
+
+    function buildMessage() {
+      return KEYS.map(k => (key[k] ? '1' : '0')).join('') + String(getPower()).padStart(3, '0');
+    }
+
+    function sendState() {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(buildMessage());
+    }
+
+    // if key down, send state 
+    function setKey(k, down) {
+      if (keys[k] === down) return; 
+      keys[k] = down; 
+      const btn = document.getElementById('key-' + k);
+      if (btn) btn.classList.toggle('active', down);
+      sendState(); 
+    }
+
+    function releaseAll() {
+      KEYS.forEach(k => setKey(k, false));
+    }
+
+    function connect() {
+      ws = new WebSocket('ws://' + location.hostname + ':' + WS_PORT);
+      ws.onopen = function () { setStatus(true); sendState(); };
+      ws.onclose = function () {
+        setStatus(false); 
+        releaseAll();
+
+        // retry after 2 seconds 
+        setTimeout(connect, 2000);
+      };
+    }
+
+    // all safety measures, stops driving if typing, if random key pressed, resume when 
+    // no longer pressed 
+    function isTyping(e) {
+      const t = e.target; 
+      return t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && ['text', 
+        'number', 'search', 'email', 'password'].includes(t.type));
+    }
+
+    document.addEventListener('keydown', function (e) {
+      const k = e.key.toLowerCase(); 
+      if (!KEYS.includes(k) || isTyping(e)|| e.ctrlKey || e.metaKey || e.altKey ) return; 
+      e.preventDefault(); 
+      setKey(k, true);
+    })
+
+    document.addEventListener('keyup', function(e) {
+      const k = e.key.toLowerCase();
+      if (KEYS.includes(k)) setKey(k, false);
+    })
+
+    // if tab loses focus, release all keys 
+    window.addEventListener('blur', releaseAll);
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) releaseAll(); 
+    })
+
+    // allow for usage of on-screen buttons (with both MOUSE and TOUCH)
+
+    KEYS.forEach(function (k) {
+      const btn = document.getElementById('key-' + k);
+      if (!btn) return; 
+      btn.addEventListener('pointerdown', function (e) {
+        e.preventDefault(); 
+
+        // keep getting events even if the finger drifts away from button 
+        btn.setPointerCapture(e.pointerId);
+        setKey(k,true);
+      });
+
+      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (ev) {
+        btn.addEventListener(ev, function () { setKey(k, false); });
+      });
+
+      btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    })
+
+    // speed box 
+    if (powerEl) {
+      powerEl.addEventListener('input', sendState);
+      powerEl.addEventListener('change', function () {
+        powerEl.value = getPower(); 
+        sendState(); 
+      });
+      powerEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') powerEl.blur(); // hitting enter lets you leave box so WASD works 
+      });
+    }
+
+    connect(); 
+    setInterval(sendState, SEND_MS);
+  }) (); 
 });
