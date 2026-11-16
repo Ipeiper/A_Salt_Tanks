@@ -1,0 +1,966 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>ESP32 OV2640</title>
+        <style>
+            /* ESP32 camera web UI - styles (de-minified from the original) */
+            body {
+                font-family: Arial,Helvetica,sans-serif;
+                background: #181818;
+                color: #EFEFEF;
+                font-size: 16px;
+            }
+
+            h2 {
+                font-size: 18px;
+            }
+
+            section.main {
+                display: flex;
+            }
+
+            #menu,
+            section.main {
+                flex-direction: column;
+            }
+
+            #menu {
+                display: none;
+                flex-wrap: nowrap;
+                min-width: 340px;
+                background: #363636;
+                padding: 8px;
+                border-radius: 4px;
+                margin-top: -10px;
+                margin-right: 10px;
+            }
+
+            #content {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: stretch;
+            }
+
+            figure {
+                padding: 0;
+                margin: 0;
+                -webkit-margin-before: 0;
+                margin-block-start: 0;
+                -webkit-margin-after: 0;
+                margin-block-end: 0;
+                -webkit-margin-start: 0;
+                margin-inline-start: 0;
+                -webkit-margin-end: 0;
+                margin-inline-end: 0;
+            }
+
+            figure img {
+                display: block;
+                width: 100%;
+                height: auto;
+                border-radius: 4px;
+                margin-top: 8px;
+            }
+
+            @media (min-width: 800px) and (orientation:landscape) {
+                #content {
+                    display: flex;
+                    flex-wrap: nowrap;
+                    align-items: stretch;
+                }
+
+                figure img {
+                    display: block;
+                    max-width: 100%;
+                    max-height: calc(100vh - 40px);
+                    width: auto;
+                    height: auto;
+                }
+
+                figure {
+                    padding: 0;
+                    margin: 0;
+                    -webkit-margin-before: 0;
+                    margin-block-start: 0;
+                    -webkit-margin-after: 0;
+                    margin-block-end: 0;
+                    -webkit-margin-start: 0;
+                    margin-inline-start: 0;
+                    -webkit-margin-end: 0;
+                    margin-inline-end: 0;
+                }
+
+            }
+
+            section#buttons {
+                display: flex;
+                flex-wrap: nowrap;
+                justify-content: space-between;
+            }
+
+            #nav-toggle {
+                cursor: pointer;
+                display: block;
+            }
+
+            #nav-toggle-cb {
+                outline: 0;
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+
+            #nav-toggle-cb:checked+#menu {
+                display: flex;
+            }
+
+            .input-group {
+                display: flex;
+                flex-wrap: nowrap;
+                line-height: 22px;
+                margin: 5px 0;
+            }
+
+            .input-group>label {
+                display: inline-block;
+                padding-right: 10px;
+                min-width: 47%;
+            }
+
+            .input-group input,
+            .input-group select {
+                flex-grow: 1;
+            }
+
+            .range-max,
+            .range-min {
+                display: inline-block;
+                padding: 0 5px;
+            }
+
+            button {
+                display: block;
+                margin: 5px;
+                padding: 0 12px;
+                border: 0;
+                line-height: 28px;
+                cursor: pointer;
+                color: #fff;
+                background: #ff3034;
+                border-radius: 5px;
+                font-size: 16px;
+                outline: 0;
+            }
+
+            button:hover {
+                background: #ff494d;
+            }
+
+            button:active {
+                background: #f21c21;
+            }
+
+            button.disabled {
+                cursor: default;
+                background: #a0a0a0;
+            }
+
+            input[type=range] {
+                -webkit-appearance: none;
+                width: 100%;
+                height: 22px;
+                background: #363636;
+                cursor: pointer;
+                margin: 0;
+            }
+
+            input[type=range]:focus {
+                outline: 0;
+            }
+
+            input[type=range]::-webkit-slider-runnable-track {
+                width: 100%;
+                height: 2px;
+                cursor: pointer;
+                background: #EFEFEF;
+                border-radius: 0;
+                border: 0 solid #EFEFEF;
+            }
+
+            input[type=range]::-webkit-slider-thumb {
+                border: 1px solid rgba(0,0,30,0);
+                height: 22px;
+                width: 22px;
+                border-radius: 50px;
+                background: #ff3034;
+                cursor: pointer;
+                -webkit-appearance: none;
+                margin-top: -11.5px;
+            }
+
+            input[type=range]:focus::-webkit-slider-runnable-track {
+                background: #EFEFEF;
+            }
+
+            input[type=range]::-moz-range-track {
+                width: 100%;
+                height: 2px;
+                cursor: pointer;
+                background: #EFEFEF;
+                border-radius: 0;
+                border: 0 solid #EFEFEF;
+            }
+
+            input[type=range]::-moz-range-thumb {
+                border: 1px solid rgba(0,0,30,0);
+                height: 22px;
+                width: 22px;
+                border-radius: 50px;
+                background: #ff3034;
+                cursor: pointer;
+            }
+
+            input[type=range]::-ms-track {
+                width: 100%;
+                height: 2px;
+                cursor: pointer;
+                background: 0 0;
+                border-color: transparent;
+                color: transparent;
+            }
+
+            input[type=range]::-ms-fill-lower {
+                background: #EFEFEF;
+                border: 0 solid #EFEFEF;
+                border-radius: 0;
+            }
+
+            input[type=range]::-ms-fill-upper {
+                background: #EFEFEF;
+                border: 0 solid #EFEFEF;
+                border-radius: 0;
+            }
+
+            input[type=range]::-ms-thumb {
+                border: 1px solid rgba(0,0,30,0);
+                height: 22px;
+                width: 22px;
+                border-radius: 50px;
+                background: #ff3034;
+                cursor: pointer;
+                height: 2px;
+            }
+
+            input[type=range]:focus::-ms-fill-lower {
+                background: #EFEFEF;
+            }
+
+            input[type=range]:focus::-ms-fill-upper {
+                background: #363636;
+            }
+
+            .switch {
+                display: block;
+                position: relative;
+                line-height: 22px;
+                font-size: 16px;
+                height: 22px;
+            }
+
+            .switch input {
+                outline: 0;
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+
+            .slider {
+                width: 50px;
+                height: 22px;
+                border-radius: 22px;
+                cursor: pointer;
+                background-color: grey;
+            }
+
+            .slider,
+            .slider:before {
+                display: inline-block;
+                transition: .4s;
+            }
+
+            .slider:before {
+                position: relative;
+                content: "";
+                border-radius: 50%;
+                height: 16px;
+                width: 16px;
+                left: 4px;
+                top: 3px;
+                background-color: #fff;
+            }
+
+            input:checked+.slider {
+                background-color: #ff3034;
+            }
+
+            input:checked+.slider:before {
+                -webkit-transform: translateX(26px);
+                transform: translateX(26px);
+            }
+
+            select {
+                border: 1px solid #363636;
+                font-size: 14px;
+                height: 22px;
+                outline: 0;
+                border-radius: 5px;
+            }
+
+            .image-container {
+                position: relative;
+                min-width: 160px;
+            }
+
+            .close {
+                position: absolute;
+                right: 5px;
+                top: 5px;
+                background: #ff3034;
+                width: 16px;
+                height: 16px;
+                border-radius: 100px;
+                color: #fff;
+                text-align: center;
+                line-height: 18px;
+                cursor: pointer;
+            }
+
+            .hidden {
+                display: none;
+            }
+
+        </style>
+
+        <style>
+            #drive { margin: 12px 0; text-align: center; -webkit-user-select: none; user-select: none; }
+            #drive h4 { margin: 0 0 6px; }
+            #ws-status { font-size: 13px; margin-bottom: 10px; }
+            #ws-status.on { color: #4caf50; }
+            #ws-status.off { color: #e53935; }
+            #drive .dpad { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 64px); gap: 6px; justify-content: center; }
+            #drive .dpad button { width: 64px; height: 64px; margin: 0; padding: 0; font-size: 22px; font-weight: bold; line-height: 1; color: #fff; 
+            background: #3a3a3a; border: 0; border-radius: 8px; cursor: pointer; touch-action: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+            #drive .dpad button.active { background: #ff3034; transform: translateY(2px); }
+            #key-w { grid-column: 2; grid-row: 1; }
+            #key-a { grid-column: 1; grid-row: 2; }
+            #key-s { grid-column: 2; grid-row: 2; }
+            #key-d { grid-column: 3; grid-row: 2; }
+            #drive .power { margin-top: 14px; }
+            #drive .power input[type=number] { width: 70px; padding: 4px; font-size: 16px; text-align: center; }
+
+            /* for wide screens, have teh drive panel float in the corner */ 
+            @media (min-width: 800px) and (orientation: landscape) {
+                #drive { position: fixed; right: 12px; bottom: 12px; margin: 0; padding: 10px 14px; background: rgba(54, 54, 54, 0.9); border-radius: 8px; z-index: 10; }
+            }
+        </style>
+    </head>
+    <body>
+        <!-- Page layout: [toggle button] + [settings sidebar] + [video/still image] -->
+        <section class="main">
+            <div id="logo">
+                <label for="nav-toggle-cb" id="nav-toggle">&#9776;&nbsp;&nbsp;Toggle settings</label>
+            </div>
+            <div id="content">
+                <div id="sidebar">
+                    <input type="checkbox" id="nav-toggle-cb" checked="checked">
+                    <!-- Settings panel. Every control with class "default-action" is wired to
+                         the ESP32's /control endpoint by script.js, using its id as the setting name. -->
+                    <nav id="menu">
+                        <div class="input-group" id="framesize-group">
+                            <label for="framesize">Resolution</label>
+                            <select id="framesize" class="default-action">
+                                <option value="10">UXGA(1600x1200)</option>
+                                <option value="9">SXGA(1280x1024)</option>
+                                <option value="8">XGA(1024x768)</option>
+                                <option value="7">SVGA(800x600)</option>
+                                <option value="6">VGA(640x480)</option>
+                                <option value="5" selected="selected">CIF(400x296)</option>
+                                <option value="4">QVGA(320x240)</option>
+                                <option value="3">HQVGA(240x176)</option>
+                                <option value="0">QQVGA(160x120)</option>
+                            </select>
+                        </div>
+                        <div class="input-group" id="quality-group">
+                            <label for="quality">Quality</label>
+                            <div class="range-min">10</div>
+                            <input type="range" id="quality" min="10" max="63" value="10" class="default-action">
+                            <div class="range-max">63</div>
+                        </div>
+                        <div class="input-group" id="brightness-group">
+                            <label for="brightness">Brightness</label>
+                            <div class="range-min">-2</div>
+                            <input type="range" id="brightness" min="-2" max="2" value="0" class="default-action">
+                            <div class="range-max">2</div>
+                        </div>
+                        <div class="input-group" id="contrast-group">
+                            <label for="contrast">Contrast</label>
+                            <div class="range-min">-2</div>
+                            <input type="range" id="contrast" min="-2" max="2" value="0" class="default-action">
+                            <div class="range-max">2</div>
+                        </div>
+                        <div class="input-group" id="saturation-group">
+                            <label for="saturation">Saturation</label>
+                            <div class="range-min">-2</div>
+                            <input type="range" id="saturation" min="-2" max="2" value="0" class="default-action">
+                            <div class="range-max">2</div>
+                        </div>
+                        <div class="input-group" id="special_effect-group">
+                            <label for="special_effect">Special Effect</label>
+                            <select id="special_effect" class="default-action">
+                                <option value="0" selected="selected">No Effect</option>
+                                <option value="1">Negative</option>
+                                <option value="2">Grayscale</option>
+                                <option value="3">Red Tint</option>
+                                <option value="4">Green Tint</option>
+                                <option value="5">Blue Tint</option>
+                                <option value="6">Sepia</option>
+                            </select>
+                        </div>
+                        <div class="input-group" id="awb-group">
+                            <label for="awb">AWB</label>
+                            <div class="switch">
+                                <input id="awb" type="checkbox" class="default-action" checked="checked">
+                                <label class="slider" for="awb"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="awb_gain-group">
+                            <label for="awb_gain">AWB Gain</label>
+                            <div class="switch">
+                                <input id="awb_gain" type="checkbox" class="default-action" checked="checked">
+                                <label class="slider" for="awb_gain"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="wb_mode-group">
+                            <label for="wb_mode">WB Mode</label>
+                            <select id="wb_mode" class="default-action">
+                                <option value="0" selected="selected">Auto</option>
+                                <option value="1">Sunny</option>
+                                <option value="2">Cloudy</option>
+                                <option value="3">Office</option>
+                                <option value="4">Home</option>
+                            </select>
+                        </div>
+                        <div class="input-group" id="aec-group">
+                            <label for="aec">AEC SENSOR</label>
+                            <div class="switch">
+                                <input id="aec" type="checkbox" class="default-action" checked="checked">
+                                <label class="slider" for="aec"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="aec2-group">
+                            <label for="aec2">AEC DSP</label>
+                            <div class="switch">
+                                <input id="aec2" type="checkbox" class="default-action" checked="checked">
+                                <label class="slider" for="aec2"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="ae_level-group">
+                            <label for="ae_level">AE Level</label>
+                            <div class="range-min">-2</div>
+                            <input type="range" id="ae_level" min="-2" max="2" value="0" class="default-action">
+                            <div class="range-max">2</div>
+                        </div>
+                        <div class="input-group" id="aec_value-group">
+                            <label for="aec_value">Exposure</label>
+                            <div class="range-min">0</div>
+                            <input type="range" id="aec_value" min="0" max="1200" value="204" class="default-action">
+                            <div class="range-max">1200</div>
+                        </div>
+                        <div class="input-group" id="agc-group">
+                            <label for="agc">AGC</label>
+                            <div class="switch">
+                                <input id="agc" type="checkbox" class="default-action" checked="checked">
+                                <label class="slider" for="agc"></label>
+                            </div>
+                        </div>
+                        <div class="input-group hidden" id="agc_gain-group">
+                            <label for="agc_gain">Gain</label>
+                            <div class="range-min">1x</div>
+                            <input type="range" id="agc_gain" min="0" max="30" value="5" class="default-action">
+                            <div class="range-max">31x</div>
+                        </div>
+                        <div class="input-group" id="gainceiling-group">
+                            <label for="gainceiling">Gain Ceiling</label>
+                            <div class="range-min">2x</div>
+                            <input type="range" id="gainceiling" min="0" max="6" value="0" class="default-action">
+                            <div class="range-max">128x</div>
+                        </div>
+                        <div class="input-group" id="bpc-group">
+                            <label for="bpc">BPC</label>
+                            <div class="switch">
+                                <input id="bpc" type="checkbox" class="default-action">
+                                <label class="slider" for="bpc"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="wpc-group">
+                            <label for="wpc">WPC</label>
+                            <div class="switch">
+                                <input id="wpc" type="checkbox" class="default-action" checked="checked">
+                                <label class="slider" for="wpc"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="raw_gma-group">
+                            <label for="raw_gma">Raw GMA</label>
+                            <div class="switch">
+                                <input id="raw_gma" type="checkbox" class="default-action" checked="checked">
+                                <label class="slider" for="raw_gma"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="lenc-group">
+                            <label for="lenc">Lens Correction</label>
+                            <div class="switch">
+                                <input id="lenc" type="checkbox" class="default-action" checked="checked">
+                                <label class="slider" for="lenc"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="hmirror-group">
+                            <label for="hmirror">H-Mirror</label>
+                            <div class="switch">
+                                <input id="hmirror" type="checkbox" class="default-action" checked="checked">
+                                <label class="slider" for="hmirror"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="vflip-group">
+                            <label for="vflip">V-Flip</label>
+                            <div class="switch">
+                                <input id="vflip" type="checkbox" class="default-action" checked="checked">
+                                <label class="slider" for="vflip"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="dcw-group">
+                            <label for="dcw">DCW (Downsize EN)</label>
+                            <div class="switch">
+                                <input id="dcw" type="checkbox" class="default-action" checked="checked">
+                                <label class="slider" for="dcw"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="colorbar-group">
+                            <label for="colorbar">Color Bar</label>
+                            <div class="switch">
+                                <input id="colorbar" type="checkbox" class="default-action">
+                                <label class="slider" for="colorbar"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="face_detect-group">
+                            <label for="face_detect">Face Detection</label>
+                            <div class="switch">
+                                <input id="face_detect" type="checkbox" class="default-action">
+                                <label class="slider" for="face_detect"></label>
+                            </div>
+                        </div>
+                        <div class="input-group" id="face_recognize-group">
+                            <label for="face_recognize">Face Recognition</label>
+                            <div class="switch">
+                                <input id="face_recognize" type="checkbox" class="default-action">
+                                <label class="slider" for="face_recognize"></label>
+                            </div>
+                        </div>
+                        <!-- Get Still / Start-Stop Stream / Enroll Face (handled individually in script.js) -->
+                        <section id="buttons">
+                            <button id="get-still">Get Still</button>
+                            <button id="toggle-stream">Start Stream</button>
+                            <button id="face_enroll" class="disabled" disabled="disabled">Enroll Face</button>
+                        </section>
+                    </nav>
+                </div>
+                <!-- Image area: hidden until a still or stream is requested -->
+                <figure>
+                    <div id="stream-container" class="image-container hidden">
+                        <div class="close" id="close-stream">×</div>
+                        <img id="stream" src="">
+                    </div>
+                </figure>
+            </div>
+            <div id = "drive">
+                <h4>Drive</h4>
+                <div id = "ws-status" class = "off"> Controls: disconnected </div>
+                <div class = "dpad">
+                    <button id = "key-w" type = "button">W</button>
+                    <button id = "key-a" type = "button">A</button>
+                    <button id = "key-s" type = "button">S</button>
+                    <button id = "key-d" type = "button">D</button>
+                </div>
+                <div class = "power">
+                    <label for = "drive-power">Speed (0-100)</label>
+                    <input type="number" id = "drive-power" min ="0" max="100" step="1" value="20">
+                    <span>%</span>
+                </div>
+            </div> 
+        </section>
+        <script>
+            /*
+            * ESP32 camera web UI - client-side logic (de-minified from the original).
+            *
+            * How it talks to the ESP32 (all plain HTTP GET requests):
+            *   GET  <origin>/status              -> JSON with the camera's current settings
+            *   GET  <origin>/control?var=X&val=Y -> change setting X to value Y
+            *   GET  <origin>/capture?_cb=<time>  -> a single JPEG still
+            *   GET  <origin>:81/stream           -> MJPEG video stream (separate server on port 81)
+            *
+            * The big idea: every settings control in the HTML has class "default-action" and an
+            * id that is the name of the camera setting (e.g. id="brightness"). When the user
+            * changes a control, we send  /control?var=<id>&val=<value>.
+            */
+            document.addEventListener('DOMContentLoaded', function () {
+
+            // Base URL of the ESP32, e.g. "http://192.168.1.50"
+            var baseHost = document.location.origin;
+
+            // ---------------------------------------------------------------------------
+            // Helpers
+            // ---------------------------------------------------------------------------
+
+            // Send one setting change to the ESP32.
+            // The value depends on the kind of control that triggered it.
+            function sendControl(el) {
+                let value;
+
+                switch (el.type) {
+                case 'checkbox':
+                    value = el.checked ? 1 : 0;        // switches become 1 / 0
+                    break;
+                case 'range':                        // sliders
+                case 'select-one':                   // dropdowns
+                    value = el.value;
+                    break;
+                case 'button':
+                case 'submit':
+                    value = '1';                       // buttons just send "1" (e.g. Enroll Face)
+                    break;
+                default:
+                    return;                            // anything else: do nothing
+                }
+
+                const url = `${baseHost}/control?var=${el.id}&val=${value}`;
+                fetch(url).then(response => {
+                console.log(`request to ${url} finished, status: ${response.status}`);
+                });
+            }
+
+            // Show / hide an element via the .hidden CSS class
+            const hide = el => { el.classList.add('hidden'); };
+            const show = el => { el.classList.remove('hidden'); };
+
+            // Grey-out / re-enable a button
+            const disable = el => { el.classList.add('disabled'); el.disabled = true; };
+            const enable  = el => { el.classList.remove('disabled'); el.disabled = false; };
+
+            // Set a control to `value` from code.
+            //   updateRemote = true  (default): also send the change to the ESP32 if the value changed
+            //   updateRemote = false          : only update the UI (used when loading /status), and
+            //                                   show/hide the dependent controls accordingly
+            const setControl = (el, value, updateRemote) => {
+                updateRemote = (updateRemote === undefined || updateRemote === null) ? true : updateRemote;
+
+                let oldValue;
+                if (el.type === 'checkbox') {
+                oldValue = el.checked;
+                value = !!value;                     // force to true/false
+                el.checked = value;
+                } else {
+                oldValue = el.value;
+                el.value = value;
+                }
+
+                if (updateRemote && oldValue !== value) {
+                sendControl(el);
+                } else if (!updateRemote) {
+                // Keep dependent controls in sync with the loaded value:
+                if (el.id === 'aec') {
+                    // Auto-exposure on  -> hide manual exposure slider
+                    value ? hide(aecValueGroup) : show(aecValueGroup);
+                } else if (el.id === 'agc') {
+                    // Auto-gain on -> hide manual gain slider, show gain-ceiling slider
+                    if (value) { show(gainCeilingGroup); hide(agcGainGroup); }
+                    else       { hide(gainCeilingGroup); show(agcGainGroup); }
+                } else if (el.id === 'awb_gain') {
+                    // AWB gain on -> show the white-balance mode dropdown
+                    value ? show(wbModeGroup) : hide(wbModeGroup);
+                } else if (el.id === 'face_recognize') {
+                    // Face recognition on -> allow "Enroll Face"
+                    value ? enable(faceEnrollBtn) : disable(faceEnrollBtn);
+                }
+                }
+            };
+
+            // ---------------------------------------------------------------------------
+            // Grab the elements we need
+            // ---------------------------------------------------------------------------
+            const streamImg       = document.getElementById('stream');
+            const streamContainer = document.getElementById('stream-container');
+            const getStillBtn     = document.getElementById('get-still');
+            const toggleStreamBtn = document.getElementById('toggle-stream');
+            const faceEnrollBtn   = document.getElementById('face_enroll');
+            const closeStreamBtn  = document.getElementById('close-stream');
+
+            const agc             = document.getElementById('agc');
+            const agcGainGroup    = document.getElementById('agc_gain-group');
+            const gainCeilingGroup = document.getElementById('gainceiling-group');
+
+            const aec             = document.getElementById('aec');
+            const aecValueGroup   = document.getElementById('aec_value-group');
+
+            const awbGain         = document.getElementById('awb_gain');
+            const wbModeGroup     = document.getElementById('wb_mode-group');
+
+            const faceDetect      = document.getElementById('face_detect');
+            const faceRecognize   = document.getElementById('face_recognize');
+            const framesize       = document.getElementById('framesize');
+
+            // ---------------------------------------------------------------------------
+            // Initial load: ask the ESP32 for its current settings and apply them to the UI
+            // (without sending anything back)
+            // ---------------------------------------------------------------------------
+            fetch(`${baseHost}/status`)
+                .then(response => response.json())
+                .then(status => {
+                document.querySelectorAll('.default-action').forEach(el => {
+                    setControl(el, status[el.id], false);   // status keys match the element ids
+                });
+                });
+
+            // Little "x" buttons hide whatever panel they're inside
+            document.querySelectorAll('.close').forEach(btn => {
+                btn.onclick = () => { hide(btn.parentNode); };
+            });
+
+            // ---------------------------------------------------------------------------
+            // Still image / video stream
+            // ---------------------------------------------------------------------------
+            const stopStream = () => {
+                window.stop();                              // cancels the in-flight stream request
+                toggleStreamBtn.innerHTML = 'Start Stream';
+            };
+
+            const startStream = () => {
+                streamImg.src = `${baseHost + ':81'}/stream`;   // stream is served on port 81
+                show(streamContainer);
+                toggleStreamBtn.innerHTML = 'Stop Stream';
+            };
+
+            getStillBtn.onclick = () => {
+                stopStream();
+                streamImg.src = `${baseHost}/capture?_cb=${Date.now()}`;  // _cb = cache-buster
+                show(streamContainer);
+            };
+
+            closeStreamBtn.onclick = () => {
+                stopStream();
+                hide(streamContainer);
+            };
+
+            toggleStreamBtn.onclick = () => {
+                const streaming = toggleStreamBtn.innerHTML === 'Stop Stream';
+                if (streaming) stopStream(); else startStream();
+            };
+
+            faceEnrollBtn.onclick = () => { sendControl(faceEnrollBtn); };
+
+            // ---------------------------------------------------------------------------
+            // Default behaviour: any ".default-action" control sends its value on change.
+            // (Some controls below override this with their own handler.)
+            // ---------------------------------------------------------------------------
+            document.querySelectorAll('.default-action').forEach(el => {
+                el.onchange = () => sendControl(el);
+            });
+
+            // ---------------------------------------------------------------------------
+            // Controls that also change what is visible in the UI
+            // ---------------------------------------------------------------------------
+
+            // Auto Gain Control: on -> show gain ceiling, hide manual gain; off -> the reverse
+            agc.onchange = () => {
+                sendControl(agc);
+                if (agc.checked) { show(gainCeilingGroup); hide(agcGainGroup); }
+                else             { hide(gainCeilingGroup); show(agcGainGroup); }
+            };
+
+            // Auto Exposure (sensor): on -> hide manual exposure slider
+            aec.onchange = () => {
+                sendControl(aec);
+                aec.checked ? hide(aecValueGroup) : show(aecValueGroup);
+            };
+
+            // AWB Gain: on -> show the WB Mode dropdown
+            awbGain.onchange = () => {
+                sendControl(awbGain);
+                awbGain.checked ? show(wbModeGroup) : hide(wbModeGroup);
+            };
+
+            // ---------------------------------------------------------------------------
+            // Face detection / recognition only work at CIF (value 5) or smaller resolution.
+            // Framesize values: bigger number = bigger picture (10 = UXGA ... 5 = CIF ... 0 = QQVGA)
+            // ---------------------------------------------------------------------------
+
+            // Changing resolution: if it's now bigger than CIF, switch both face features off
+            framesize.onchange = () => {
+                sendControl(framesize);
+                if (framesize.value > 5) {
+                setControl(faceDetect, false);
+                setControl(faceRecognize, false);
+                }
+            };
+
+            faceDetect.onchange = () => {
+                if (framesize.value > 5) {
+                alert('Please select CIF or lower resolution before enabling this feature!');
+                setControl(faceDetect, false);           // undo the tick
+                return;
+                }
+                sendControl(faceDetect);
+                if (!faceDetect.checked) {
+                // Turning detection off also turns recognition off and disables enrolling
+                disable(faceEnrollBtn);
+                setControl(faceRecognize, false);
+                }
+            };
+
+            faceRecognize.onchange = () => {
+                if (framesize.value > 5) {
+                alert('Please select CIF or lower resolution before enabling this feature!');
+                setControl(faceRecognize, false);        // undo the tick
+                return;
+                }
+                sendControl(faceRecognize);
+                if (faceRecognize.checked) {
+                // Recognition needs detection, so switch that on too and allow enrolling
+                enable(faceEnrollBtn);
+                setControl(faceDetect, true);
+                } else {
+                disable(faceEnrollBtn);
+                }
+            };
+
+            // added script for keys and keyboard 
+            (function () {
+                const WS_PORT = 82; 
+                const SEND_MS = 100; 
+                const KEYS = ['w', 'a', 's', 'd'];
+                const keys = {w: false, a: false, s: false, d: false };
+
+                const statusEl = document.getElementById('ws-status');
+                const powerEl = document.getElementById('drive-power');
+                let ws = null; 
+
+                function setStatus(connected) {
+                if (!statusEl) return; 
+                statusEl.textContent = connected ? 'Controls: connected' : 'Controls: disconnected';
+                statusEl.className = connected ? 'on' : 'off';
+                }
+
+                function getPower() {
+                // checking for invalid values 
+                return Math.max(0, Math.min(100, parseInt(powerEl.value,10) || 0));
+                }
+
+                function buildMessage() {
+                return KEYS.map(k => (key[k] ? '1' : '0')).join('') + String(getPower()).padStart(3, '0');
+                }
+
+                function sendState() {
+                if (ws && ws.readyState === WebSocket.OPEN) ws.send(buildMessage());
+                }
+
+                // if key down, send state 
+                function setKey(k, down) {
+                if (keys[k] === down) return; 
+                keys[k] = down; 
+                const btn = document.getElementById('key-' + k);
+                if (btn) btn.classList.toggle('active', down);
+                sendState(); 
+                }
+
+                function releaseAll() {
+                KEYS.forEach(k => setKey(k, false));
+                }
+
+                function connect() {
+                ws = new WebSocket('ws://' + location.hostname + ':' + WS_PORT);
+                ws.onopen = function () { setStatus(true); sendState(); };
+                ws.onclose = function () {
+                    setStatus(false); 
+                    releaseAll();
+
+                    // retry after 2 seconds 
+                    setTimeout(connect, 2000);
+                };
+                }
+
+                // all safety measures, stops driving if typing, if random key pressed, resume when 
+                // no longer pressed 
+                function isTyping(e) {
+                const t = e.target; 
+                return t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && ['text', 
+                    'number', 'search', 'email', 'password'].includes(t.type));
+                }
+
+                document.addEventListener('keydown', function (e) {
+                const k = e.key.toLowerCase(); 
+                if (!KEYS.includes(k) || isTyping(e)|| e.ctrlKey || e.metaKey || e.altKey ) return; 
+                e.preventDefault(); 
+                setKey(k, true);
+                })
+
+                document.addEventListener('keyup', function(e) {
+                const k = e.key.toLowerCase();
+                if (KEYS.includes(k)) setKey(k, false);
+                })
+
+                // if tab loses focus, release all keys 
+                window.addEventListener('blur', releaseAll);
+                document.addEventListener('visibilitychange', function() {
+                if (document.hidden) releaseAll(); 
+                })
+
+                // allow for usage of on-screen buttons (with both MOUSE and TOUCH)
+
+                KEYS.forEach(function (k) {
+                const btn = document.getElementById('key-' + k);
+                if (!btn) return; 
+                btn.addEventListener('pointerdown', function (e) {
+                    e.preventDefault(); 
+
+                    // keep getting events even if the finger drifts away from button 
+                    btn.setPointerCapture(e.pointerId);
+                    setKey(k,true);
+                });
+
+                ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (ev) {
+                    btn.addEventListener(ev, function () { setKey(k, false); });
+                });
+
+                btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+                })
+
+                // speed box 
+                if (powerEl) {
+                powerEl.addEventListener('input', sendState);
+                powerEl.addEventListener('change', function () {
+                    powerEl.value = getPower(); 
+                    sendState(); 
+                });
+                powerEl.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') powerEl.blur(); // hitting enter lets you leave box so WASD works 
+                });
+                }
+
+                connect(); 
+                setInterval(sendState, SEND_MS);
+            }) (); 
+            });
+
+        </script>
+    </body>
+</html>
