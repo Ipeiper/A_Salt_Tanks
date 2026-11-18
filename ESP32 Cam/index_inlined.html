@@ -866,7 +866,7 @@
                 }
 
                 function buildMessage() {
-                return KEYS.map(k => (key[k] ? '1' : '0')).join('') + String(getPower()).padStart(3, '0');
+                return KEYS.map(k => (keys[k] ? '1' : '0')).join('') + String(getPower()).padStart(3, '0');
                 }
 
                 function sendState() {

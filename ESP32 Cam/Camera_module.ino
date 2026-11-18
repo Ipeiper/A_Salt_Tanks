@@ -30,46 +30,6 @@ const uint16_t WS_PORT = 82;
 const unsigned long SEND_INTERVAL_MS = 100;   // state is re-sent to the main board this often
 const unsigned long CLIENT_TIMEOUT_MS = 500;  // no message from the website for this long -> stop
 
-#if defined(CAMERA_MODEL_WROVER_KIT)
-#define PWDN_GPIO_NUM    -1
-#define RESET_GPIO_NUM   -1
-#define XCLK_GPIO_NUM    21
-#define SIOD_GPIO_NUM    26
-#define SIOC_GPIO_NUM    27
-
-#define Y9_GPIO_NUM      35
-#define Y8_GPIO_NUM      34
-#define Y7_GPIO_NUM      39
-#define Y6_GPIO_NUM      36
-#define Y5_GPIO_NUM      19
-#define Y4_GPIO_NUM      18
-#define Y3_GPIO_NUM       5
-#define Y2_GPIO_NUM       4
-#define VSYNC_GPIO_NUM   25
-#define HREF_GPIO_NUM    23
-#define PCLK_GPIO_NUM    22
-
-#elif defined(CAMERA_MODEL_M5STACK_PSRAM)
-#define PWDN_GPIO_NUM     -1
-#define RESET_GPIO_NUM    15
-#define XCLK_GPIO_NUM     27
-#define SIOD_GPIO_NUM     25
-#define SIOC_GPIO_NUM     23
-
-#define Y9_GPIO_NUM       19
-#define Y8_GPIO_NUM       36
-#define Y7_GPIO_NUM       18
-#define Y6_GPIO_NUM       39
-#define Y5_GPIO_NUM        5
-#define Y4_GPIO_NUM       34
-#define Y3_GPIO_NUM       35
-#define Y2_GPIO_NUM       32
-#define VSYNC_GPIO_NUM    22
-#define HREF_GPIO_NUM     26
-#define PCLK_GPIO_NUM     21
-
-// because we're using ai thinker... 
-#elif defined(CAMERA_MODEL_AI_THINKER)
 #define PWDN_GPIO_NUM     32
 #define RESET_GPIO_NUM    -1
 #define XCLK_GPIO_NUM      0
@@ -87,10 +47,6 @@ const unsigned long CLIENT_TIMEOUT_MS = 500;  // no message from the website for
 #define VSYNC_GPIO_NUM    25
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
-
-#else
-#error "Camera model not selected"
-#endif
 
 void startCameraServer();
 
@@ -196,6 +152,9 @@ void setup() {
   //Open Serial port for cam & main communication
   Serial2.begin(UART_BAUD,SERIAL_8N1, UART_RX_PIN, UART_TX_PIN);
 
+  // make sure it starts stopped 
+  sendButtonStates(false, false, false, false, 0);
+
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -276,11 +235,13 @@ void loop() {
   // failsafe (if tabs close of wifi drops)
   if (now - lastMsgMs > CLIENT_TIMEOUT_MS) {
     releaseAllKeys(); 
+    sendButtonStates(false, false, false, false, motorpower);
   }
 
   // failsafe (if network lost)
   if (WiFi.status() != WL_CONNECTED) {
     releaseAllKeys();
+    sendButtonStates(false, false, false, false, motorpower);
   }
 
   // constantly send the states over 

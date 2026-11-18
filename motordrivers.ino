@@ -1,3 +1,4 @@
+// source code for reference 
 const int RPWM = 25, LPWM = 26, R_EN = 32, L_EN = 33, R_IS = 34, L_IS = 35;
 const int PWM_HZ = 20000, PWM_BITS = 8;
 const int MAX_DUTY = 127;          // ~50% cap, protects the 12V motor on an 18V pack
