@@ -42,7 +42,7 @@ bool keyD = false;
 int motorPower = 20; 
 
 // keep track of when the last valid message was from when the cam arrived
-unsigned long lastMsgMs = 0; 
+unsigned long lastMsgMs = millis(); 
 
 // for future message to be received from camera
 char lineBuf[16];
