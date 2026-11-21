@@ -3,20 +3,30 @@
 #ifndef ESPNOWCOMMS_H
 #define ESPNOWCOMMS_H
 
-#include <Arduino.h>
+#include <WiFi.h>
 #include <esp_now.h>
+#include <esp_wifi.h>
 
-typedef struct
-{
+// Message structure
+typedef struct struct_message {
+    uint8_t sender_ID;
     int motor_1;
     int motor_2;
     int motor_3;
     int motor_4;
+    uint32_t timestamp;
 } struct_message;
 
-void nowSetup();
+// Global state arrays
+extern struct_message deviceState[20];
+extern bool deviceOnline[20];
+extern unsigned long lastUpdate[20];
+
+// Main interface functions
+int nowSetup();
 
 void nowUpdate(
+    int myID,
     int motor_1,
     int motor_2,
     int motor_3,
@@ -25,28 +35,27 @@ void nowUpdate(
     int send_count
 );
 
-String readMacAddress();
+void checkOnlineStatus();
+
+// Helper functions
+bool readMacAddress(uint8_t mac[6]);
 
 int MACtoID(
-    const String& MAC,
-    const String devices[],
+    const uint8_t MAC[6],
+    const uint8_t devices[][6],
     int numDevices
 );
 
-String IDtoMAC(
-    int ID,
-    const String devices[],
-    int numDevices
-);
-
-bool MACcol_to_MACarr(
-    const String& MACcol,
-    uint8_t MACarr[6]
-);
-
+// ESP-NOW callbacks
 void OnDataSent(
     const uint8_t *mac_addr,
     esp_now_send_status_t status
+);
+
+void OnDataRecv(
+    const uint8_t *mac,
+    const uint8_t *incomingData,
+    int len
 );
 
 #endif
