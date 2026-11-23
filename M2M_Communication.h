@@ -21,6 +21,7 @@ typedef struct struct_message {
 extern struct_message deviceState[20];
 extern bool deviceOnline[20];
 extern unsigned long lastUpdate[20];
+extern int deviceDistance[20];
 
 // Main interface functions
 int nowSetup();

@@ -27,16 +27,19 @@
 
 // defines the devices and their IDs
 static uint8_t devices[][6] = {
-    {0x70,0x4B,0xCA,0x25,0xC1,0x5C}
+    {0x70,0x4B,0xCA,0x25,0xC1,0x5C},
+    {0x70,0x4B,0xCA,0x25,0xEB,0x24}
 };
 static int numDevices= sizeof(devices)/sizeof(devices[0]);
 
 //array storing the most recent message from each possible device
-struct_message deviceState[20];
+struct_message deviceState[numDevices];
 //bool describing whether a given device is online
-bool deviceOnline[20];
+bool deviceOnline[numDevices];
 //when that device was last updated
-unsigned long lastUpdate[20];
+unsigned long lastUpdate[numDevices];
+//the distance to each device
+int deviceDistance[numDevices];
 //runs the setup code for esp now and establishes variables like setup uaually does
 //should hold that a list that will be hardcoded for the MAC address and the device names of each. Maybe make it pull from a file called something like DeviceMacRegistry that is a CSV with the macs and device ids
 //needs to find the devices MAC address, establish which device that means it is, and start communicating to the others
